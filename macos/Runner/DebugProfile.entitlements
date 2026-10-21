@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 闪拾需要辅助功能（模拟⌘C抓取）、EventKit 与系统事件，不做 App Store 分发，关闭沙盒 -->
+</dict>
+</plist>
