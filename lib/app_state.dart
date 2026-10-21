@@ -181,7 +181,11 @@ class AppState extends ChangeNotifier {
     }
 
     final preview = trimmed.split('\n').first;
-    final suffix = source == 'clipboard' ? '（来自剪贴板）' : '';
+    final suffix = switch (source) {
+      'clipboard' => '（未选中文字，已存剪贴板内容）',
+      'clipboard-timeout' => '（复制超时，已存剪贴板内容）',
+      _ => '',
+    };
     try {
       await FlashpickPlatform.showHud('$preview$suffix');
     } catch (_) {}

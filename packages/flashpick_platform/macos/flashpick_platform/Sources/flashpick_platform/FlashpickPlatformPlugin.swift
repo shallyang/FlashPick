@@ -172,11 +172,17 @@ public class FlashpickPlatformPlugin: NSObject, FlutterPlugin {
       let captured = SelectionCapture.capture()
       DispatchQueue.main.async {
         guard let self else { return }
-        if let (text, source) = captured {
-          self.channel.invokeMethod("onCaptured", arguments: ["text": text, "source": source])
-        } else {
+        guard let (text, source) = captured else {
           self.hud.show("没有抓到文字（未选中且剪贴板为空）")
+          return
         }
+        if source == "clipboard-untrusted" {
+          // 未授权辅助功能：不入库，直接引导授权
+          self.hud.show("需要「辅助功能」权限才能抓取选中文字")
+          SelectionCapture.promptTrust()
+          return
+        }
+        self.channel.invokeMethod("onCaptured", arguments: ["text": text, "source": source])
       }
     }
   }

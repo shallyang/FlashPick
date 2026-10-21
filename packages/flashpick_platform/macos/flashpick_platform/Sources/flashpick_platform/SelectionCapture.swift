@@ -2,7 +2,7 @@ import ApplicationServices
 import Cocoa
 
 /// 抓取当前选中文字：暂存剪贴板 → 模拟 ⌘C → 读新内容 → 恢复剪贴板。
-/// 无选中（或无辅助功能权限）时回退读取当前剪贴板。
+/// 无辅助功能权限或复制超时时回退读取当前剪贴板，并在 source 中注明原因。
 enum SelectionCapture {
   static func isTrusted() -> Bool {
     AXIsProcessTrusted()
@@ -42,25 +42,22 @@ enum SelectionCapture {
     return SavedPasteboard(items: items)
   }
 
-  /// 返回 (文字, 来源)；抓不到返回 nil。
-  static func capture(timeoutMs: Int = 250) -> (String, String)? {
+  /// 返回 (文字, 来源)；来源为 selection / clipboard / clipboard-untrusted / clipboard-timeout。
+  static func capture(timeoutMs: Int = 350) -> (String, String)? {
     guard isTrusted() else {
-      return readClipboard()
+      NSLog("[FlashPick] capture: 无辅助功能权限，回退剪贴板")
+      return readClipboard("clipboard-untrusted")
     }
     let pb = NSPasteboard.general
     let saved = snapshotPasteboard(pb)
     let changeCountBefore = pb.changeCount
 
+    // 两次尝试：部分应用（Electron/微信等）响应较慢
     postCommandC()
-
-    var captured = false
-    let deadline = Date().addingTimeInterval(TimeInterval(timeoutMs) / 1000.0)
-    while Date() < deadline {
-      if pb.changeCount != changeCountBefore {
-        captured = true
-        break
-      }
-      usleep(8000)
+    var captured = waitChange(pb, since: changeCountBefore, ms: 180)
+    if !captured {
+      postCommandC()
+      captured = waitChange(pb, since: changeCountBefore, ms: timeoutMs - 180)
     }
 
     var text: String?
@@ -70,9 +67,22 @@ enum SelectionCapture {
     saved.restore(to: pb)
 
     if let text, !text.isEmpty {
+      NSLog("[FlashPick] capture: 选中文字抓取成功 (%d 字)", text.count)
       return (text, "selection")
     }
-    return readClipboard()
+    NSLog("[FlashPick] capture: 复制未生效(captured=%d)，回退剪贴板", captured ? 1 : 0)
+    return readClipboard(captured ? "clipboard" : "clipboard-timeout")
+  }
+
+  private static func waitChange(_ pb: NSPasteboard, since count: Int, ms: Int) -> Bool {
+    let deadline = Date().addingTimeInterval(TimeInterval(ms) / 1000.0)
+    while Date() < deadline {
+      if pb.changeCount != count {
+        return true
+      }
+      usleep(5000)
+    }
+    return pb.changeCount != count
   }
 
   private static func postCommandC() {
@@ -81,6 +91,7 @@ enum SelectionCapture {
       let down = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(8), keyDown: true),
       let up = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(8), keyDown: false)
     else { return }
+    // 显式覆盖修饰键集合，避免叠加用户尚未松开的 ⌃⇧
     down.flags = .maskCommand
     up.flags = .maskCommand
     down.post(tap: .cghidEventTap)
@@ -103,8 +114,8 @@ enum SelectionCapture {
     return nil
   }
 
-  private static func readClipboard() -> (String, String)? {
+  private static func readClipboard(_ source: String) -> (String, String)? {
     guard let s = readString(NSPasteboard.general), !s.isEmpty else { return nil }
-    return (s, "clipboard")
+    return (s, source)
   }
 }
