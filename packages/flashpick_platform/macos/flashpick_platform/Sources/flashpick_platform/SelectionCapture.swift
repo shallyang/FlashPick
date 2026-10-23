@@ -52,6 +52,10 @@ enum SelectionCapture {
     let saved = snapshotPasteboard(pb)
     let changeCountBefore = pb.changeCount
 
+    // 关键：等用户松开热键修饰键再发 ⌘C，
+    // 否则目标应用会把合成事件与仍按着的 ⌃⇧ 合并，复制被丢弃
+    waitModifierRelease()
+
     // 两次尝试：部分应用（Electron/微信等）响应较慢
     postCommandC()
     var captured = waitChange(pb, since: changeCountBefore, ms: 180)
@@ -72,6 +76,27 @@ enum SelectionCapture {
     }
     NSLog("[FlashPick] capture: 复制未生效(captured=%d)，回退剪贴板", captured ? 1 : 0)
     return readClipboard(captured ? "clipboard" : "clipboard-timeout")
+  }
+
+  /// 等待热键修饰键（⌃/⇧/⌥/⌘）物理释放，最多 timeoutMs。
+  private static func waitModifierRelease(timeoutMs: Int = 400) {
+    let modifiers: [CGKeyCode] = [0x3B /*ctrl*/, 0x38 /*shift*/, 0x3A /*opt*/, 0x37 /*cmd*/]
+    let start = Date()
+    let deadline = start.addingTimeInterval(TimeInterval(timeoutMs) / 1000.0)
+    while Date() < deadline {
+      let anyDown = modifiers.contains {
+        CGEventSource.keyState(.combinedSessionState, key: $0)
+      }
+      if !anyDown {
+        // 等 keyUp 事件传播完毕再合成 ⌘C
+        usleep(30000)
+        NSLog("[FlashPick] capture: 修饰键已松开，等待 %dms",
+              Int(Date().timeIntervalSince(start) * 1000))
+        return
+      }
+      usleep(8000)
+    }
+    NSLog("[FlashPick] capture: 修饰键未松开，超时后仍尝试 ⌘C")
   }
 
   private static func waitChange(_ pb: NSPasteboard, since count: Int, ms: Int) -> Bool {
