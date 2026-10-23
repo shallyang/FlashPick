@@ -60,6 +60,12 @@ class _FlashpickAppState extends State<FlashpickApp> with WindowListener {
   }
 
   @override
+  void onWindowFocus() {
+    // 从系统设置授权回来时立即刷新权限状态
+    context.read<AppState>().refreshPermissions();
+  }
+
+  @override
   void dispose() {
     windowManager.removeListener(this);
     super.dispose();
