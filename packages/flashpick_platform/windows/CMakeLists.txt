@@ -44,6 +44,11 @@ set_target_properties(${PLUGIN_NAME} PROPERTIES
   CXX_VISIBILITY_PRESET hidden)
 target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
 
+# 源码含中文/全角字符字面量，MSVC 需显式按 UTF-8 编译（否则 C4066/乱码）
+if(MSVC)
+  target_compile_options(${PLUGIN_NAME} PRIVATE "/utf-8")
+endif()
+
 # Source include directories and library dependencies. Add any plugin-specific
 # dependencies here.
 target_include_directories(${PLUGIN_NAME} INTERFACE

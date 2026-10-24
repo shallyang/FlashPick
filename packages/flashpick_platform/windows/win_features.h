@@ -4,6 +4,11 @@
 #ifndef FLASHPICK_PLATFORM_WIN_FEATURES_H_
 #define FLASHPICK_PLATFORM_WIN_FEATURES_H_
 
+// windows.h 的 min/max 宏会与 std::min/std::max 冲突（MSVC C2589）
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include <windows.h>
 #include <functional>
 #include <string>
