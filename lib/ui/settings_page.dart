@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -43,14 +45,16 @@ class SettingsPage extends StatelessWidget {
         ]),
 
         _section(context, '同步', [
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('镜像到系统提醒事项'),
-            subtitle: const Text('每条待办同步写入「提醒事项」的「闪拾」清单，经 iCloud 到 iPhone'),
-            value: state.mirrorEnabled,
-            onChanged: (v) => state.setMirrorEnabled(v),
-          ),
-          const Divider(height: 8),
+          if (Platform.isMacOS) ...[
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('镜像到系统提醒事项'),
+              subtitle: const Text('每条待办同步写入「提醒事项」的「闪拾」清单，经 iCloud 到 iPhone'),
+              value: state.mirrorEnabled,
+              onChanged: (v) => state.setMirrorEnabled(v),
+            ),
+            const Divider(height: 8),
+          ],
           ListTile(
             contentPadding: EdgeInsets.zero,
             enabled: false,
@@ -62,14 +66,16 @@ class SettingsPage extends StatelessWidget {
         ]),
 
         _section(context, '通用', [
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('桌面清单'),
-            subtitle: const Text('在桌面常驻显示待办小组件，可拖动、右键置顶'),
-            value: state.desktopWidgetVisible,
-            onChanged: (v) => state.setDesktopWidgetVisible(v),
-          ),
-          const Divider(height: 8),
+          if (Platform.isMacOS) ...[
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('桌面清单'),
+              subtitle: const Text('在桌面常驻显示待办小组件，可拖动、右键置顶'),
+              value: state.desktopWidgetVisible,
+              onChanged: (v) => state.setDesktopWidgetVisible(v),
+            ),
+            const Divider(height: 8),
+          ],
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('开机自动启动'),
@@ -85,7 +91,7 @@ class SettingsPage extends StatelessWidget {
               subtitle: Text(snap.data ?? '…',
                   style: const TextStyle(fontSize: 11.5, fontFamily: 'monospace')),
               trailing: IconButton(
-                tooltip: '在 Finder 中显示',
+                tooltip: '在资源管理器中显示',
                 icon: const Icon(Icons.folder_open, size: 20),
                 onPressed: snap.data == null
                     ? null
@@ -95,12 +101,13 @@ class SettingsPage extends StatelessWidget {
           ),
         ]),
 
-        _section(context, '权限', [
-          _permissionRow(context, state, '辅助功能（抓取选中文字）', 'accessibility'),
-          _permissionRow(context, state, '麦克风（语音输入）', 'microphone'),
-          _permissionRow(context, state, '语音识别', 'speech'),
-          _permissionRow(context, state, '提醒事项（镜像）', 'reminders'),
-        ]),
+        if (Platform.isMacOS)
+          _section(context, '权限', [
+            _permissionRow(context, state, '辅助功能（抓取选中文字）', 'accessibility'),
+            _permissionRow(context, state, '麦克风（语音输入）', 'microphone'),
+            _permissionRow(context, state, '语音识别', 'speech'),
+            _permissionRow(context, state, '提醒事项（镜像）', 'reminders'),
+          ]),
 
         const SizedBox(height: 8),
         Center(

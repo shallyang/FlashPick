@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  flashpick_platform
   screen_retriever_windows
   window_manager
 )

@@ -48,11 +48,15 @@ class AppState extends ChangeNotifier {
       panelHotkey,
     );
     autostart = await FlashpickPlatform.isAutostart();
-    try {
-      await FlashpickPlatform.setWidgetVisible(desktopWidgetVisible);
-    } catch (_) {}
+    if (Platform.isMacOS) {
+      try {
+        await FlashpickPlatform.setWidgetVisible(desktopWidgetVisible);
+      } catch (_) {}
+    }
     await refreshTodos();
-    await refreshPermissions();
+    if (Platform.isMacOS) {
+      await refreshPermissions();
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -123,7 +127,9 @@ class AppState extends ChangeNotifier {
         showMainWindow(tab: 1);
         break;
       case 'toggleWidget':
-        await setDesktopWidgetVisible(!desktopWidgetVisible);
+        if (Platform.isMacOS) {
+          await setDesktopWidgetVisible(!desktopWidgetVisible);
+        }
         break;
       default:
         break;
@@ -141,10 +147,14 @@ class AppState extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// 在 Finder 中显示数据库文件。
+  /// 在 Finder / 资源管理器中显示数据库文件。
   Future<void> revealDbFolder(String path) async {
     try {
-      await Process.run('open', ['-R', path]);
+      if (Platform.isMacOS) {
+        await Process.run('open', ['-R', path]);
+      } else if (Platform.isWindows) {
+        await Process.run('explorer', ['/select,$path']);
+      }
     } catch (_) {}
   }
 
@@ -177,8 +187,8 @@ class AppState extends ChangeNotifier {
     await store.insertTodo(todo);
     todos.insert(0, todo);
 
-    // 镜像到系统提醒事项
-    if (mirrorEnabled) {
+    // 镜像到系统提醒事项（macOS 专属，Windows 走 Phase 2 云同步）
+    if (mirrorEnabled && Platform.isMacOS) {
       try {
         final ekId = await FlashpickPlatform.mirrorTodo(todo.id, trimmed);
         if (ekId != null) {
@@ -208,7 +218,7 @@ class AppState extends ChangeNotifier {
     if (todo != null) {
       todo.done = done;
       todo.doneAt = done ? DateTime.now().millisecondsSinceEpoch : null;
-      if (mirrorEnabled && todo.mirrorId != null) {
+      if (mirrorEnabled && Platform.isMacOS && todo.mirrorId != null) {
         try {
           await FlashpickPlatform.setMirrorCompleted(todo.mirrorId!, done);
         } catch (_) {}
@@ -221,7 +231,7 @@ class AppState extends ChangeNotifier {
   Future<void> remove(String id) async {
     await store.remove(id);
     final todo = todos.where((t) => t.id == id).firstOrNull;
-    if (mirrorEnabled && todo?.mirrorId != null) {
+    if (mirrorEnabled && Platform.isMacOS && todo?.mirrorId != null) {
       try {
         await FlashpickPlatform.deleteMirror(todo!.mirrorId!);
       } catch (_) {}

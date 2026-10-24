@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -70,33 +71,39 @@ class _OnboardingPageState extends State<OnboardingPage> {
             const SizedBox(height: 26),
             _step(context, '1', '热键抓取',
                 '在任何应用里选中文字，按 ${state.captureHotkey} 直接收进闪拾，全程零弹窗。'),
-            _step(context, '2', '语音速记',
-                '按 ${state.panelHotkey} 打开捕捉窗，按住麦克风说中文，松开自动转成文字。'),
-            _step(context, '3', '自动同步 iPhone',
-                '待办会镜像到系统「提醒事项」的「闪拾」清单，经 iCloud 出现在手机上（可在设置中关闭）。'),
+            _step(context, '2', '速记窗',
+                Platform.isMacOS
+                    ? '按 ${state.panelHotkey} 打开捕捉窗，按住麦克风说中文，松开自动转成文字。'
+                    : '按 ${state.panelHotkey} 打开速记窗，输入文字回车保存（语音速记 Windows 版开发中）。'),
+            _step(context, '3',
+                Platform.isMacOS ? '自动同步 iPhone' : '数据保存在本机',
+                Platform.isMacOS
+                    ? '待办会镜像到系统「提醒事项」的「闪拾」清单，经 iCloud 出现在手机上（可在设置中关闭）。'
+                    : '待办保存在本地 SQLite 数据库，不上传；跨设备云同步在 Phase 2 上线。'),
             const SizedBox(height: 26),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(12),
+            if (Platform.isMacOS)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('授权（都是本地权限，不联网）',
+                        style:
+                            TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 10),
+                    _permRow(context, '辅助功能 — 抓取选中文字必需',
+                        perms?.accessibility == true, 'accessibility'),
+                    _permRow(context, '麦克风 + 语音识别 — 语音速记必需',
+                        perms?.microphone == true && perms?.speech == true, 'runtime'),
+                    _permRow(context, '提醒事项 — 镜像同步必需',
+                        perms?.reminders == true, 'reminders'),
+                  ],
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('授权（都是本地权限，不联网）',
-                      style:
-                          TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 10),
-                  _permRow(context, '辅助功能 — 抓取选中文字必需',
-                      perms?.accessibility == true, 'accessibility'),
-                  _permRow(context, '麦克风 + 语音识别 — 语音速记必需',
-                      perms?.microphone == true && perms?.speech == true, 'runtime'),
-                  _permRow(context, '提醒事项 — 镜像同步必需',
-                      perms?.reminders == true, 'reminders'),
-                ],
-              ),
-            ),
             const SizedBox(height: 26),
             SizedBox(
               width: double.infinity,

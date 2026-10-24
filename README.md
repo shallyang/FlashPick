@@ -22,10 +22,22 @@
 
 | 平台 | 状态 | 说明 |
 | --- | --- | --- |
-| macOS 13+ | ✅ 可用 | 本仓库当前主力版本 |
-| Windows | 🚧 CI 出包 | 插件原生层（热键/抓取）待实现，CI 工作流已就绪 |
+| macOS 13+ | ✅ 功能完整 | 热键抓取 / 语音速记 / 菜单栏 / 桌面清单 / 提醒事项镜像 / 开机自启 |
+| Windows 10+ | 🚧 核心可用 | 热键抓取 / 文字速记窗 / 托盘+气泡 / 开机自启；语音与桌面清单开发中；无系统提醒事项，跨设备同步等 Phase 2 云同步 |
 | Android / iOS | 📅 计划 | Flutter 单代码库，语音与镜像走各平台系统 API |
 | HarmonyOS | 📅 计划 | 接入 [flutter-ohos](https://gitee.com/openharmony-sig/flutter_flutter) 分支 |
+
+### 在 Windows 上构建
+
+```powershell
+flutter pub get
+flutter build windows --release
+# 产物：build\windows\x64\runner\Release\ 整个目录（含 flashpick.exe 与 DLL）
+```
+
+要求：Visual Studio 2022（含 C++ 桌面开发工作负载）。或直接推送仓库到 GitHub，CI（`.github/workflows/build-windows.yml`）自动产出 exe。
+
+Windows 实现说明：热键走 `RegisterHotKey`，抓取走 `SendInput ^C` + 剪贴板序列号探测（同样等待修饰键释放、同样保留并恢复剪贴板全部格式），HUD 为托盘气泡通知，自启写 HKCU Run 注册表。抓取不需要额外授权（Windows 无辅助功能门槛），但以管理员权限运行的目标窗口可能拒绝合成按键。
 
 ## 从源码构建（macOS）
 
@@ -81,7 +93,7 @@ flashpick/
 ## 路线图
 
 - [ ] **Phase 2 · 云同步**：Supabase 账号体系（auth + todos 表 + RLS + realtime），登录后多端实时同步，冲突策略 updated_at LWW；库表见 [`supabase/schema.sql`](supabase/schema.sql)
-- [ ] **Windows**：`flashpick_platform` 的 C++ 原生层（RegisterHotKey / SendInput ^C / WinRT Speech / Microsoft To Do 镜像），GitHub Actions 出 exe
+- [x] **Windows**：C++ 原生层（RegisterHotKey / SendInput ^C / 托盘 / 气泡 HUD / 速记窗 / HKCU Run 自启），GitHub Actions 出 exe（Windows 语音速记、桌面清单为后续项）
 - [ ] **iOS / Android**：移动端语音（speech_to_text）、桌面镜像对应（Google Tasks / 系统日历）
 - [ ] **HarmonyOS**：接入 flutter-ohos，DevEco 出 hap
 - [ ] 应用图标与启动渲染资源
