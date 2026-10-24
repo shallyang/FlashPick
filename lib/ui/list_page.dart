@@ -7,6 +7,7 @@ import '../store.dart';
 const _sourceLabels = {
   'hotkey': '热键',
   'panel': '捕捉窗',
+  'widget': '组件',
   'clipboard': '剪贴板',
   'menu': '菜单',
 };

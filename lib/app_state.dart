@@ -42,6 +42,7 @@ class AppState extends ChangeNotifier {
       PlatformCallbacks(
         onCaptured: onCaptured,
         onPanelSubmit: onPanelSubmit,
+        onQuickAdd: onQuickAdd,
         onMenuAction: onMenuAction,
       ),
       captureHotkey,
@@ -110,6 +111,10 @@ class AppState extends ChangeNotifier {
 
   Future<void> onPanelSubmit(String text) async {
     await _addInternal(text, 'panel');
+  }
+
+  Future<void> onQuickAdd(String text) async {
+    await _addInternal(text, 'widget');
   }
 
   Future<void> onMenuAction(String action, String? todoId) async {

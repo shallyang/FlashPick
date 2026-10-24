@@ -1,24 +1,29 @@
 import Cocoa
 
 /// 桌面清单小组件：常驻桌面角落的半透明待办列表。
-/// 圆圈点击=完成，双击文字=打开主窗口，右键=置顶开关/关闭，可整体拖动。
-final class DesktopWidgetController: NSObject {
+/// 圆圈点击=完成，双击文字=打开主窗口，右键=置顶开关/关闭，可整体拖动，
+/// 底部内嵌快速录入框（回车入库 / Esc 清空）。
+final class DesktopWidgetController: NSObject, NSTextFieldDelegate {
   static let shared = DesktopWidgetController()
 
   private var panel: NSPanel?
   private var container: NSStackView!
+  private var inputField: NSTextField!
   private var todos: [[String: Any]] = []
   private(set) var isVisible = false
 
   var onToggleTodo: ((String) -> Void)?
   var onOpenMain: (() -> Void)?
   var onToggleVisibility: (() -> Void)?
+  var onQuickAdd: ((String) -> Void)?
 
   private let width: CGFloat = 268
   private let maxRows = 8
 
   final class WidgetPanel: NSPanel {
-    override var canBecomeKey: Bool { false }
+    // 需要能成为 key window，底部输入框才能打字
+    // （nonactivatingPanel：成为 key 不会把闪拾激活到前台）
+    override var canBecomeKey: Bool { true }
   }
 
   final class WidgetView: NSVisualEffectView {
@@ -84,6 +89,23 @@ final class DesktopWidgetController: NSObject {
       container.topAnchor.constraint(equalTo: effect.topAnchor),
       container.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
     ])
+
+    // 快速录入框（常驻底部）
+    inputField = NSTextField()
+    inputField.placeholderString = "＋ 输入新待办，回车保存"
+    inputField.font = NSFont.systemFont(ofSize: 12.5)
+    inputField.textColor = .labelColor
+    inputField.backgroundColor = NSColor.white.withAlphaComponent(0.08)
+    inputField.drawsBackground = true
+    inputField.isBordered = false
+    inputField.focusRingType = .none
+    inputField.lineBreakMode = .byTruncatingTail
+    inputField.cell?.truncatesLastVisibleLine = true
+    inputField.cell?.wraps = false
+    inputField.delegate = self
+    inputField.translatesAutoresizingMaskIntoConstraints = false
+    inputField.widthAnchor.constraint(equalToConstant: width - 28).isActive = true
+    inputField.heightAnchor.constraint(equalToConstant: 26).isActive = true
 
     let p = WidgetPanel(
       contentRect: NSRect(x: 0, y: 0, width: width, height: 120),
@@ -170,6 +192,9 @@ final class DesktopWidgetController: NSObject {
       }
     }
 
+    // 底部快速录入框
+    container.addView(inputField, in: .leading)
+
     // 依据内容自适应高度（锚定左上角）
     let contentSize = container.fittingSize
     let height = max(contentSize.height, 64)
@@ -239,5 +264,27 @@ final class DesktopWidgetController: NSObject {
 
   @objc private func rowDoubleClicked(_ g: NSClickGestureRecognizer) {
     onOpenMain?()
+  }
+}
+
+extension DesktopWidgetController {
+  // 快速录入框：回车提交、Esc 清空
+  func control(_ control: NSControl, textView: NSTextView,
+               doCommandBy commandSelector: Selector) -> Bool {
+    if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+      let text = textView.string.trimmingCharacters(in: .whitespacesAndNewlines)
+      if !text.isEmpty {
+        onQuickAdd?(text)
+      }
+      textView.string = ""
+      panel?.makeFirstResponder(nil)
+      return true
+    }
+    if commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+      textView.string = ""
+      panel?.makeFirstResponder(nil)
+      return true
+    }
+    return false
   }
 }

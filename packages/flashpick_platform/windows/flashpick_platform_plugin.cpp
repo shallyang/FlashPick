@@ -259,6 +259,13 @@ void FlashpickPlatformPlugin::OnNativeEvent(const std::string& event,
                            std::make_unique<flutter::EncodableValue>(m));
     return;
   }
+  if (event == "quickAdd") {
+    flutter::EncodableMap m;
+    m[flutter::EncodableValue("text")] = flutter::EncodableValue(arg1);
+    channel_->InvokeMethod("onQuickAdd",
+                           std::make_unique<flutter::EncodableValue>(m));
+    return;
+  }
   if (event == "menuAction") {
     if (arg1 == "main") {
       win_.ShowMainWindow();

@@ -555,6 +555,55 @@ constexpr int kWidgetWidth = 272;
 constexpr int kWidgetRowH = 26;
 constexpr int kWidgetHeaderH = 34;
 constexpr int kWidgetMaxRows = 8;
+constexpr int kWidgetInputH = 26;
+
+// 小组件内嵌输入框：点击时解除 NOACTIVATE 以获得真实键盘输入
+LRESULT CALLBACK WidgetInputProc(HWND hwnd, UINT msg, WPARAM wparam,
+                                 LPARAM lparam, UINT_PTR id, DWORD_PTR ref) {
+  WinFeatures* self = reinterpret_cast<WinFeatures*>(ref);
+  switch (msg) {
+    case WM_LBUTTONDOWN: {
+      HWND parent = GetParent(hwnd);
+      LONG_PTR style = GetWindowLongPtrW(parent, GWL_EXSTYLE);
+      if (style & WS_EX_NOACTIVATE) {
+        SetWindowLongPtrW(parent, GWL_EXSTYLE, style & ~WS_EX_NOACTIVATE);
+        SetForegroundWindow(parent);
+      }
+      break;
+    }
+    case WM_KILLFOCUS: {
+      // 输入框失焦后恢复 NOACTIVATE，点击组件不再抢激活
+      HWND parent = GetParent(hwnd);
+      LONG_PTR style = GetWindowLongPtrW(parent, GWL_EXSTYLE);
+      SetWindowLongPtrW(parent, GWL_EXSTYLE, style | WS_EX_NOACTIVATE);
+      break;
+    }
+    case WM_KEYDOWN:
+      if (wparam == VK_RETURN) {
+        wchar_t buf[1024];
+        GetWindowTextW(hwnd, buf, 1024);
+        std::wstring w(buf);
+        // 去首尾空白
+        while (!w.empty() && iswspace(w.front())) w.erase(w.begin());
+        while (!w.empty() && iswspace(w.back())) w.pop_back();
+        if (!w.empty() && self) {
+          self->SendEventAsync("quickAdd", WideToUtf8(w));
+        }
+        SetWindowTextW(hwnd, L"");
+        return 0;
+      }
+      if (wparam == VK_ESCAPE) {
+        SetWindowTextW(hwnd, L"");
+        SetFocus(nullptr);
+        return 0;
+      }
+      break;
+    default:
+      break;
+  }
+  return DefSubclassProc(hwnd, msg, wparam, lparam);
+}
+}  // namespace
 constexpr COLORREF kWidgetBg = RGB(28, 28, 32);
 constexpr COLORREF kWidgetText = RGB(238, 238, 242);
 constexpr COLORREF kWidgetDim = RGB(150, 150, 158);
@@ -581,7 +630,6 @@ void LoadWidgetPrefs(int& x, int& y, bool& has_pos, bool& pinned) {
   pinned = vp != 0;
   RegCloseKey(key);
 }
-}  // namespace
 
 void WinFeatures::SetWidgetVisible(bool on) {
   widget_visible_ = on;
@@ -631,6 +679,16 @@ void WinFeatures::EnsureWidgetWindow() {
                              DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
                              CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
                              DEFAULT_PITCH | FF_DONTCARE, L"Microsoft YaHei UI");
+
+  // 底部快速录入框
+  widget_input_ = CreateWindowExW(
+      0, L"EDIT", nullptr, WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 14, 0,
+      kWidgetWidth - 28, kWidgetInputH, widget_, nullptr,
+      GetModuleHandle(nullptr), nullptr);
+  SetWindowSubclass(widget_input_, WidgetInputProc, 1, (DWORD_PTR)this);
+  SendMessage(widget_input_, EM_SETCUEBANNER, TRUE,
+              (LPARAM)L"＋ 输入新待办，回车保存");
+  SendMessage(widget_input_, WM_SETFONT, (WPARAM)widget_font_, TRUE);
 }
 
 void WinFeatures::UpdateWidgetLayout() {
@@ -644,7 +702,7 @@ void WinFeatures::UpdateWidgetLayout() {
   int height = kWidgetHeaderH + 10 +
                (pending == 0 ? kWidgetRowH
                              : rows * kWidgetRowH + extra * kWidgetRowH) +
-               8;
+               8 + kWidgetInputH + 6;
   RECT rc;
   GetWindowRect(widget_, &rc);
   int w = rc.right - rc.left;
@@ -654,6 +712,10 @@ void WinFeatures::UpdateWidgetLayout() {
                  SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
     HRGN rgn = CreateRoundRectRgn(0, 0, kWidgetWidth, height, 14, 14);
     SetWindowRgn(widget_, rgn, TRUE);
+  }
+  if (widget_input_) {
+    SetWindowPos(widget_input_, nullptr, 14, height - kWidgetInputH - 10,
+                 kWidgetWidth - 28, kWidgetInputH, SWP_NOZORDER);
   }
   InvalidateRect(widget_, nullptr, TRUE);
 }
@@ -770,6 +832,14 @@ LRESULT WinFeatures::HandleWidgetMessage(HWND hwnd, UINT msg, WPARAM wparam,
   switch (msg) {
     case WM_ERASEBKGND:
       return 1;
+    case WM_CTLCOLOREDIT: {
+      // 快速录入框的深色主题
+      HDC dc = (HDC)wparam;
+      SetBkColor(dc, RGB(44, 44, 50));
+      SetTextColor(dc, RGB(238, 238, 242));
+      static HBRUSH edit_brush = CreateSolidBrush(RGB(44, 44, 50));
+      return (LRESULT)edit_brush;
+    }
     case WM_PAINT: {
       PAINTSTRUCT ps;
       HDC dc = BeginPaint(hwnd, &ps);
@@ -813,6 +883,7 @@ LRESULT WinFeatures::HandleWidgetMessage(HWND hwnd, UINT msg, WPARAM wparam,
     }
     case WM_DESTROY:
       widget_ = nullptr;
+      widget_input_ = nullptr;
       widget_created_ = false;
       return 0;
     default:

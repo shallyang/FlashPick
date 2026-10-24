@@ -59,6 +59,8 @@ class WinFeatures {
   // 供内部回调（匿名命名空间 lambda）触发事件
   void SendEvent(const std::string& e, const std::string& a = "",
                  const std::string& b = "");
+  void SendEventAsync(const std::string& e, const std::string& a = "",
+                      const std::string& b = "");
 
  private:
   static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam,
@@ -71,8 +73,6 @@ class WinFeatures {
 
   void EnsureHostWindow();
   void BuildAndShowTrayMenu();
-  void SendEventAsync(const std::string& e, const std::string& a = "",
-                      const std::string& b = "");
 
   // 桌面小组件
   void EnsureWidgetWindow();
@@ -92,6 +92,7 @@ class WinFeatures {
 
   // 桌面小组件状态
   HWND widget_ = nullptr;
+  HWND widget_input_ = nullptr;  // 底部快速录入 EDIT
   bool widget_visible_ = false;
   bool widget_pinned_ = true;
   bool widget_created_ = false;

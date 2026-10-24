@@ -110,7 +110,7 @@ class SettingsPage extends StatelessWidget {
         const SizedBox(height: 8),
         Center(
           child: Text(
-            '闪拾 FlashPick v1.0.0 · 开源软件（MIT）',
+            '闪拾 FlashPick v1.1.0 · 开源软件（MIT）',
             style: TextStyle(fontSize: 11.5, color: colorScheme.outline),
           ),
         ),

@@ -65,6 +65,7 @@ class PlatformCallbacks {
   const PlatformCallbacks({
     this.onCaptured,
     this.onPanelSubmit,
+    this.onQuickAdd,
     this.onMenuAction,
   });
 
@@ -73,6 +74,9 @@ class PlatformCallbacks {
 
   /// 快速捕捉窗提交了文字。
   final void Function(String text)? onPanelSubmit;
+
+  /// 桌面小组件底部快速录入框提交了文字。
+  final void Function(String text)? onQuickAdd;
 
   /// 菜单栏动作。action: capture / main / settings / quit / toggle，todoId 仅 toggle 有值。
   final void Function(String action, String? todoId)? onMenuAction;
@@ -98,6 +102,9 @@ class FlashpickPlatform {
           break;
         case 'onPanelSubmit':
           _callbacks?.onPanelSubmit?.call((args?['text'] as String?) ?? '');
+          break;
+        case 'onQuickAdd':
+          _callbacks?.onQuickAdd?.call((args?['text'] as String?) ?? '');
           break;
         case 'onMenuAction':
           _callbacks?.onMenuAction?.call(

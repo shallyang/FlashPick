@@ -161,6 +161,9 @@ public class FlashpickPlatformPlugin: NSObject, FlutterPlugin {
     widget.onToggleVisibility = { [weak self] in
       self?.channel.invokeMethod("onMenuAction", arguments: ["action": "toggleWidget"])
     }
+    widget.onQuickAdd = { [weak self] text in
+      self?.channel.invokeMethod("onQuickAdd", arguments: ["text": text])
+    }
     statusMenu.onAction = { [weak self] action, todoId in
       guard let self else { return }
       switch action {
