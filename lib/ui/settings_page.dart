@@ -64,6 +64,14 @@ class SettingsPage extends StatelessWidget {
         _section(context, '通用', [
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
+            title: const Text('桌面清单'),
+            subtitle: const Text('在桌面常驻显示待办小组件，可拖动、右键置顶'),
+            value: state.desktopWidgetVisible,
+            onChanged: (v) => state.setDesktopWidgetVisible(v),
+          ),
+          const Divider(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
             title: const Text('开机自动启动'),
             value: state.autostart,
             onChanged: (v) => state.setAutostart(v),

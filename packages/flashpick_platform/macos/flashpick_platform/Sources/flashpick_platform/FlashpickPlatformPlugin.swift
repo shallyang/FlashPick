@@ -52,7 +52,14 @@ public class FlashpickPlatformPlugin: NSObject, FlutterPlugin {
     case "setMenuTodos":
       let todos = (call.arguments as? [[String: Any]]) ?? []
       statusMenu.updateTodos(todos)
+      DesktopWidgetController.shared.updateTodos(todos)
       result(nil)
+
+    case "setWidgetVisible":
+      let on = (args["visible"] as? Bool) ?? true
+      DesktopWidgetController.shared.setVisible(on)
+      statusMenu.updateWidgetVisibleState(on)
+      result(on)
 
     case "showHud":
       hud.show((args["text"] as? String) ?? "")
@@ -143,6 +150,16 @@ public class FlashpickPlatformPlugin: NSObject, FlutterPlugin {
     }
     panel.onSubmit = { [weak self] text in
       self?.channel.invokeMethod("onPanelSubmit", arguments: ["text": text])
+    }
+    let widget = DesktopWidgetController.shared
+    widget.onToggleTodo = { [weak self] id in
+      self?.channel.invokeMethod("onMenuAction", arguments: ["action": "toggle", "todoId": id])
+    }
+    widget.onOpenMain = { [weak self] in
+      self?.showMainWindow()
+    }
+    widget.onToggleVisibility = { [weak self] in
+      self?.channel.invokeMethod("onMenuAction", arguments: ["action": "toggleWidget"])
     }
     statusMenu.onAction = { [weak self] action, todoId in
       guard let self else { return }

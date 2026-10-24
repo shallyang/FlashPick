@@ -9,7 +9,8 @@ final class StatusMenuController: NSObject {
 
   private var statusItem: NSStatusItem?
   private var autostartItem: NSMenuItem?
-  private var todoStartIndex = 0
+  private var widgetItem: NSMenuItem?
+  private var widgetVisible = true
   private var menu: NSMenu?
   private var actionTargets: [MenuItemTarget] = []
 
@@ -53,6 +54,13 @@ final class StatusMenuController: NSObject {
     }
   }
 
+  func updateWidgetVisibleState(_ on: Bool) {
+    DispatchQueue.main.async { [self] in
+      widgetVisible = on
+      widgetItem?.state = on ? .on : .off
+    }
+  }
+
   private func rebuildMenu(todos: [[String: Any]]) {
     guard let menu else { return }
     actionTargets.removeAll()
@@ -87,6 +95,12 @@ final class StatusMenuController: NSObject {
     add(menu, title: "打开主窗口", action: { [weak self] in self?.onAction?("main", nil) })
     add(menu, title: "设置…", action: { [weak self] in self?.onAction?("settings", nil) })
 
+    let widget = NSMenuItem(title: "桌面清单", action: #selector(toggleWidget), keyEquivalent: "")
+    widget.target = self
+    widget.state = widgetVisible ? .on : .off
+    menu.addItem(widget)
+    widgetItem = widget
+
     let auto = NSMenuItem(title: "开机自启", action: nil, keyEquivalent: "")
     auto.target = self
     auto.action = #selector(toggleAutostart)
@@ -96,6 +110,10 @@ final class StatusMenuController: NSObject {
 
     menu.addItem(.separator())
     add(menu, title: "退出闪拾", action: { [weak self] in self?.onAction?("quit", nil) })
+  }
+
+  @objc private func toggleWidget() {
+    onAction?("toggleWidget", nil)
   }
 
   @objc private func toggleAutostart() {

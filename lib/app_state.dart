@@ -20,6 +20,7 @@ class AppState extends ChangeNotifier {
   HotkeyDef panelHotkey = HotkeyDef.panelDefault;
   bool mirrorEnabled = true;
   bool autostart = false;
+  bool desktopWidgetVisible = true;
   bool firstRun = true;
   PermissionStatus? permissions;
 
@@ -47,6 +48,9 @@ class AppState extends ChangeNotifier {
       panelHotkey,
     );
     autostart = await FlashpickPlatform.isAutostart();
+    try {
+      await FlashpickPlatform.setWidgetVisible(desktopWidgetVisible);
+    } catch (_) {}
     await refreshTodos();
     await refreshPermissions();
   }
@@ -67,6 +71,7 @@ class AppState extends ChangeNotifier {
       } catch (_) {}
     }
     mirrorEnabled = await store.getSetting('mirror.enabled') != 'false';
+    desktopWidgetVisible = await store.getSetting('desktopWidget.visible') != 'false';
     firstRun = await store.getSetting('app.firstRunDone') != 'true';
   }
 
@@ -116,6 +121,9 @@ class AppState extends ChangeNotifier {
         break;
       case 'settings':
         showMainWindow(tab: 1);
+        break;
+      case 'toggleWidget':
+        await setDesktopWidgetVisible(!desktopWidgetVisible);
         break;
       default:
         break;
@@ -242,6 +250,15 @@ class AppState extends ChangeNotifier {
   Future<void> setMirrorEnabled(bool v) async {
     mirrorEnabled = v;
     await store.setSetting('mirror.enabled', v ? 'true' : 'false');
+    notifyListeners();
+  }
+
+  Future<void> setDesktopWidgetVisible(bool v) async {
+    desktopWidgetVisible = v;
+    await store.setSetting('desktopWidget.visible', v ? 'true' : 'false');
+    try {
+      await FlashpickPlatform.setWidgetVisible(v);
+    } catch (_) {}
     notifyListeners();
   }
 

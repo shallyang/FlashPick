@@ -178,4 +178,8 @@ class FlashpickPlatform {
   static Future<void> showMainWindow() => _channel.invokeMethod('showMainWindow');
 
   static Future<void> quitApp() => _channel.invokeMethod('quitApp');
+
+  /// 显示/隐藏桌面清单小组件。
+  static Future<void> setWidgetVisible(bool visible) =>
+      _channel.invokeMethod('setWidgetVisible', {'visible': visible});
 }
