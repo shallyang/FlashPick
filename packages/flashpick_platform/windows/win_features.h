@@ -34,6 +34,10 @@ class WinFeatures {
 
   void SetMenuTodos(std::vector<TodoItem> todos);
 
+  // 桌面清单小组件
+  void SetWidgetVisible(bool on);
+  bool widget_visible() const { return widget_visible_; }
+
   void ShowHud(const std::string& message);
 
   void ShowPanel();
@@ -59,12 +63,23 @@ class WinFeatures {
  private:
   static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wparam,
                                   LPARAM lparam);
+  static LRESULT CALLBACK WidgetWndProc(HWND hwnd, UINT msg, WPARAM wparam,
+                                        LPARAM lparam);
   LRESULT HandleMessage(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
+  LRESULT HandleWidgetMessage(HWND hwnd, UINT msg, WPARAM wparam,
+                              LPARAM lparam);
 
   void EnsureHostWindow();
   void BuildAndShowTrayMenu();
   void SendEventAsync(const std::string& e, const std::string& a = "",
                       const std::string& b = "");
+
+  // 桌面小组件
+  void EnsureWidgetWindow();
+  void UpdateWidgetLayout();
+  void PaintWidget(HWND hwnd, HDC dc);
+  void ShowWidgetContextMenu();
+  void SaveWidgetPosition();
 
   HWND flutter_view_ = nullptr;
   HWND host_ = nullptr;      // 承接热键/托盘消息的隐藏窗口
@@ -74,6 +89,20 @@ class WinFeatures {
   UINT_PTR panel_grab_timer_ = 0;
   bool tray_added_ = false;
   std::vector<TodoItem> todos_;
+
+  // 桌面小组件状态
+  HWND widget_ = nullptr;
+  bool widget_visible_ = false;
+  bool widget_pinned_ = true;
+  bool widget_created_ = false;
+  HFONT widget_font_ = nullptr;
+  HFONT widget_bold_ = nullptr;
+  struct WidgetRow {
+    RECT circle;
+    RECT row;
+    std::string id;
+  };
+  std::vector<WidgetRow> widget_rows_;
 };
 
 // UTF-8 / UTF-16 转换

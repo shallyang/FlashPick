@@ -48,11 +48,9 @@ class AppState extends ChangeNotifier {
       panelHotkey,
     );
     autostart = await FlashpickPlatform.isAutostart();
-    if (Platform.isMacOS) {
-      try {
-        await FlashpickPlatform.setWidgetVisible(desktopWidgetVisible);
-      } catch (_) {}
-    }
+    try {
+      await FlashpickPlatform.setWidgetVisible(desktopWidgetVisible);
+    } catch (_) {}
     await refreshTodos();
     if (Platform.isMacOS) {
       await refreshPermissions();
@@ -127,9 +125,7 @@ class AppState extends ChangeNotifier {
         showMainWindow(tab: 1);
         break;
       case 'toggleWidget':
-        if (Platform.isMacOS) {
-          await setDesktopWidgetVisible(!desktopWidgetVisible);
-        }
+        await setDesktopWidgetVisible(!desktopWidgetVisible);
         break;
       default:
         break;

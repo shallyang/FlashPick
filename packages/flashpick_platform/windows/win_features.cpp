@@ -251,6 +251,8 @@ LRESULT WinFeatures::HandleMessage(HWND hwnd, UINT msg, WPARAM wparam,
         SendEventAsync("menuAction", "main");
       } else if (id == 111) {
         SendEventAsync("menuAction", "settings");
+      } else if (id == 113) {
+        SendEventAsync("menuAction", "toggleWidget");
       } else if (id == 112) {
         Quit();
       } else if (id >= 200) {
@@ -335,6 +337,7 @@ unsigned WinFeatures::MacKeyToVk(int mac) {
 
 void WinFeatures::SetMenuTodos(std::vector<TodoItem> todos) {
   todos_ = std::move(todos);
+  if (widget_visible_) UpdateWidgetLayout();
 }
 
 void WinFeatures::BuildAndShowTrayMenu() {
@@ -358,6 +361,8 @@ void WinFeatures::BuildAndShowTrayMenu() {
   AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
   AppendMenuW(menu, MF_STRING, 110, L"打开主窗口");
   AppendMenuW(menu, MF_STRING, 111, L"设置…");
+  AppendMenuW(menu, MF_STRING | (widget_visible_ ? MF_CHECKED : 0), 113,
+              L"桌面清单");
   AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
   AppendMenuW(menu, MF_STRING, 112, L"退出闪拾");
 
@@ -541,6 +546,279 @@ void WinFeatures::OpenSystemSettings(const std::string& pane) {
 void WinFeatures::Quit() {
   HWND main = GetAncestor(flutter_view_, GA_ROOT);
   if (main) PostMessage(main, WM_CLOSE, 0, 0);
+}
+
+// ---- 桌面清单小组件 ----
+
+namespace {
+constexpr int kWidgetWidth = 272;
+constexpr int kWidgetRowH = 26;
+constexpr int kWidgetHeaderH = 34;
+constexpr int kWidgetMaxRows = 8;
+constexpr COLORREF kWidgetBg = RGB(28, 28, 32);
+constexpr COLORREF kWidgetText = RGB(238, 238, 242);
+constexpr COLORREF kWidgetDim = RGB(150, 150, 158);
+
+void LoadWidgetPrefs(int& x, int& y, bool& has_pos, bool& pinned) {
+  HKEY key;
+  has_pos = false;
+  pinned = true;
+  if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\FlashPick", 0, KEY_QUERY_VALUE,
+                    &key) != ERROR_SUCCESS) {
+    return;
+  }
+  DWORD vx = 0, vy = 0, vp = 1, sx = 0, sy = 0;
+  if (RegQueryValueExW(key, L"WidgetX", nullptr, nullptr, (LPBYTE)&vx, &sx) ==
+          ERROR_SUCCESS &&
+      RegQueryValueExW(key, L"WidgetY", nullptr, nullptr, (LPBYTE)&vy, &sy) ==
+          ERROR_SUCCESS) {
+    x = (int)vx;
+    y = (int)vy;
+    has_pos = true;
+  }
+  DWORD szp = sizeof(vp);
+  RegQueryValueExW(key, L"WidgetPinned", nullptr, nullptr, (LPBYTE)&vp, &szp);
+  pinned = vp != 0;
+  RegCloseKey(key);
+}
+}  // namespace
+
+void WinFeatures::SetWidgetVisible(bool on) {
+  widget_visible_ = on;
+  if (!on) {
+    if (widget_) ShowWindow(widget_, SW_HIDE);
+    return;
+  }
+  EnsureWidgetWindow();
+  UpdateWidgetLayout();
+  ShowWindow(widget_, SW_SHOWNOACTIVATE);
+}
+
+void WinFeatures::EnsureWidgetWindow() {
+  if (widget_created_) return;
+  widget_created_ = true;
+
+  WNDCLASSW wc = {};
+  wc.lpfnWndProc = &WinFeatures::WidgetWndProc;
+  wc.hInstance = GetModuleHandle(nullptr);
+  wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+  wc.lpszClassName = L"FlashpickWidget";
+  wc.style = CS_DBLCLKS;
+  RegisterClassW(&wc);
+
+  int x = 0, y = 0;
+  bool has_pos = false;
+  LoadWidgetPrefs(x, y, widget_pinned_, has_pos);
+  if (!has_pos) {
+    RECT work;
+    SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+    x = work.right - kWidgetWidth - 24;
+    y = work.top + 120;
+  }
+
+  widget_ = CreateWindowExW(
+      WS_EX_TOOLWINDOW | WS_EX_LAYERED | WS_EX_NOACTIVATE |
+          (widget_pinned_ ? WS_EX_TOPMOST : 0),
+      L"FlashpickWidget", L"FlashPick Widget", WS_POPUP, x, y, kWidgetWidth,
+      96, nullptr, nullptr, GetModuleHandle(nullptr), nullptr);
+  SetLayeredWindowAttributes(widget_, 0, 244, LWA_ALPHA);
+
+  widget_font_ = CreateFontW(-15, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                             CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+                             DEFAULT_PITCH | FF_DONTCARE, L"Microsoft YaHei UI");
+  widget_bold_ = CreateFontW(-14, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+                             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                             CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+                             DEFAULT_PITCH | FF_DONTCARE, L"Microsoft YaHei UI");
+}
+
+void WinFeatures::UpdateWidgetLayout() {
+  if (!widget_) return;
+  int pending = 0;
+  for (const auto& t : todos_) {
+    if (!t.done) pending++;
+  }
+  int rows = std::min(pending, kWidgetMaxRows);
+  int extra = pending > kWidgetMaxRows ? 1 : 0;
+  int height = kWidgetHeaderH + 10 +
+               (pending == 0 ? kWidgetRowH
+                             : rows * kWidgetRowH + extra * kWidgetRowH) +
+               8;
+  RECT rc;
+  GetWindowRect(widget_, &rc);
+  int w = rc.right - rc.left;
+  int h = rc.bottom - rc.top;
+  if (w != kWidgetWidth || h != height) {
+    SetWindowPos(widget_, nullptr, 0, 0, kWidgetWidth, height,
+                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    HRGN rgn = CreateRoundRectRgn(0, 0, kWidgetWidth, height, 14, 14);
+    SetWindowRgn(widget_, rgn, TRUE);
+  }
+  InvalidateRect(widget_, nullptr, TRUE);
+}
+
+void WinFeatures::PaintWidget(HWND hwnd, HDC dc) {
+  RECT rc;
+  GetClientRect(hwnd, &rc);
+  HBRUSH bg = CreateSolidBrush(kWidgetBg);
+  FillRect(dc, &rc, bg);
+  DeleteObject(bg);
+
+  SetBkMode(dc, TRANSPARENT);
+  widget_rows_.clear();
+
+  // 头部
+  HFONT old = (HFONT)SelectObject(dc, widget_bold_);
+  SetTextColor(dc, kWidgetText);
+  RECT rTitle = {14, 10, rc.right - 60, 10 + 22};
+  DrawTextW(dc, L"闪拾 · 待办", -1, &rTitle,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+  SelectObject(dc, widget_font_);
+
+  int pending = 0;
+  for (const auto& t : todos_) {
+    if (!t.done) pending++;
+  }
+  wchar_t count[16];
+  _snwprintf_s(count, 16, _TRUNCATE, pending > 0 ? L"%d" : L"✓", pending);
+  SetTextColor(dc, kWidgetDim);
+  RECT rCount = {rc.right - 60, 10, rc.right - 14, 10 + 22};
+  DrawTextW(dc, count, -1, &rCount,
+            DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+
+  int y = kWidgetHeaderH + 4;
+  if (pending == 0) {
+    SetTextColor(dc, kWidgetDim);
+    RECT rEmpty = {14, y, rc.right - 14, y + kWidgetRowH};
+    DrawTextW(dc, L"全部完成，歇口气 ✓", -1, &rEmpty, DT_LEFT | DT_VCENTER);
+  } else {
+    int shown = 0;
+    for (const auto& t : todos_) {
+      if (t.done) continue;
+      if (shown >= kWidgetMaxRows) break;
+      WidgetRow row;
+      SetRect(&row.circle, 14, y, 34, y + kWidgetRowH);
+      SetRect(&row.row, 14, y, rc.right - 14, y + kWidgetRowH);
+      row.id = t.id;
+      widget_rows_.push_back(row);
+
+      SetTextColor(dc, kWidgetDim);
+      DrawTextW(dc, L"○", -1, &row.circle,
+                DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+      std::wstring text = Utf8ToWide(t.text);
+      RECT rText = {38, y, rc.right - 14, y + kWidgetRowH};
+      SetTextColor(dc, kWidgetText);
+      DrawTextW(dc, text.c_str(), -1, &rText,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+      y += kWidgetRowH;
+      shown++;
+    }
+    if (pending > kWidgetMaxRows) {
+      wchar_t more[32];
+      _snwprintf_s(more, 32, _TRUNCATE, L"还有 %d 项…",
+                   pending - kWidgetMaxRows);
+      SetTextColor(dc, kWidgetDim);
+      RECT rMore = {38, y, rc.right - 14, y + kWidgetRowH};
+      DrawTextW(dc, more, -1, &rMore, DT_LEFT | DT_VCENTER);
+    }
+  }
+  SelectObject(dc, old);
+}
+
+void WinFeatures::ShowWidgetContextMenu() {
+  HMENU menu = CreatePopupMenu();
+  AppendMenuW(menu, MF_STRING | (widget_pinned_ ? MF_CHECKED : 0), 301,
+              widget_pinned_ ? L"始终置顶" : L"始终置顶（当前关）");
+  AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+  AppendMenuW(menu, MF_STRING, 302, L"关闭桌面清单");
+  POINT pt;
+  GetCursorPos(&pt);
+  SetForegroundWindow(widget_ ? widget_ : host_);
+  TrackPopupMenu(menu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, widget_, nullptr);
+  PostMessage(widget_, WM_NULL, 0, 0);
+  DestroyMenu(menu);
+}
+
+void WinFeatures::SaveWidgetPosition() {
+  if (!widget_) return;
+  RECT rc;
+  GetWindowRect(widget_, &rc);
+  HKEY key;
+  if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\FlashPick", 0, nullptr, 0,
+                      KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS) {
+    return;
+  }
+  DWORD x = (DWORD)rc.left, y = (DWORD)rc.top, p = widget_pinned_ ? 1 : 0;
+  RegSetValueExW(key, L"WidgetX", 0, REG_DWORD, (const BYTE*)&x, sizeof(x));
+  RegSetValueExW(key, L"WidgetY", 0, REG_DWORD, (const BYTE*)&y, sizeof(y));
+  RegSetValueExW(key, L"WidgetPinned", 0, REG_DWORD, (const BYTE*)&p,
+                 sizeof(p));
+  RegCloseKey(key);
+}
+
+LRESULT CALLBACK WinFeatures::WidgetWndProc(HWND hwnd, UINT msg, WPARAM wparam,
+                                            LPARAM lparam) {
+  if (g_instance) {
+    return g_instance->HandleWidgetMessage(hwnd, msg, wparam, lparam);
+  }
+  return DefWindowProcW(hwnd, msg, wparam, lparam);
+}
+
+LRESULT WinFeatures::HandleWidgetMessage(HWND hwnd, UINT msg, WPARAM wparam,
+                                         LPARAM lparam) {
+  switch (msg) {
+    case WM_ERASEBKGND:
+      return 1;
+    case WM_PAINT: {
+      PAINTSTRUCT ps;
+      HDC dc = BeginPaint(hwnd, &ps);
+      PaintWidget(hwnd, dc);
+      EndPaint(hwnd, &ps);
+      return 0;
+    }
+    case WM_LBUTTONDOWN: {
+      POINTS pt = MAKEPOINTS(lparam);
+      for (const auto& row : widget_rows_) {
+        if (PtInRect(&row.circle, POINT{pt.x, pt.y})) {
+          SendEventAsync("toggleTodo", row.id);
+          return 0;
+        }
+      }
+      // 空白/标题区域按下 = 拖动窗口
+      ReleaseCapture();
+      SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+      SaveWidgetPosition();
+      return 0;
+    }
+    case WM_LBUTTONDBLCLK: {
+      // 双击任意行文字 → 打开主窗口
+      ShowMainWindow();
+      return 0;
+    }
+    case WM_RBUTTONUP:
+      ShowWidgetContextMenu();
+      return 0;
+    case WM_COMMAND: {
+      int id = LOWORD(wparam);
+      if (id == 301) {
+        widget_pinned_ = !widget_pinned_;
+        SetWindowPos(widget_, widget_pinned_ ? HWND_TOPMOST : HWND_NOTOPMOST, 0,
+                     0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        SaveWidgetPosition();
+      } else if (id == 302) {
+        SendEventAsync("menuAction", "toggleWidget");
+      }
+      return 0;
+    }
+    case WM_DESTROY:
+      widget_ = nullptr;
+      widget_created_ = false;
+      return 0;
+    default:
+      break;
+  }
+  return DefWindowProcW(hwnd, msg, wparam, lparam);
 }
 
 // ---- 选中文字抓取 ----

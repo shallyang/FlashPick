@@ -171,6 +171,19 @@ void FlashpickPlatformPlugin::HandleMethodCall(
     return;
   }
 
+  if (method == "setWidgetVisible") {
+    bool on = true;
+    if (const auto* map = std::get_if<flutter::EncodableMap>(args)) {
+      auto it = map->find(flutter::EncodableValue("visible"));
+      if (it != map->end()) {
+        if (const auto* b = std::get_if<bool>(&it->second)) on = *b;
+      }
+    }
+    win_.SetWidgetVisible(on);
+    result->Success(flutter::EncodableValue(on));
+    return;
+  }
+
   if (method == "captureSelection") {
     std::string text, source;
     bool ok = false;
@@ -227,7 +240,7 @@ void FlashpickPlatformPlugin::HandleMethodCall(
   }
 
   // Windows 暂不实现：permissions（mac 专属权限模型）、mirrorTodo 系列、
-  // setWidgetVisible、requestAccessibility、requestRuntimePermissions。
+  // requestAccessibility、requestRuntimePermissions。
   // Dart 侧已按平台隐藏相关 UI，并保留 try/catch 兜底。
   result->Error("unimplemented", "Not implemented on Windows");
 }
@@ -251,10 +264,9 @@ void FlashpickPlatformPlugin::OnNativeEvent(const std::string& event,
       win_.ShowMainWindow();
       return;
     }
-    if (arg1 == "settings") {
+    if (arg1 == "settings" || arg1 == "toggleWidget") {
       flutter::EncodableMap m;
-      m[flutter::EncodableValue("action")] =
-          flutter::EncodableValue("settings");
+      m[flutter::EncodableValue("action")] = flutter::EncodableValue(arg1);
       channel_->InvokeMethod("onMenuAction",
                              std::make_unique<flutter::EncodableValue>(m));
       return;

@@ -23,7 +23,7 @@
 | 平台 | 状态 | 说明 |
 | --- | --- | --- |
 | macOS 13+ | ✅ 功能完整 | 热键抓取 / 语音速记 / 菜单栏 / 桌面清单 / 提醒事项镜像 / 开机自启 |
-| Windows 10+ | 🚧 核心可用 | 热键抓取 / 文字速记窗 / 托盘+气泡 / 开机自启；语音与桌面清单开发中；无系统提醒事项，跨设备同步等 Phase 2 云同步 |
+| Windows 10+ | 🚧 核心可用 | 热键抓取 / 文字速记窗 / 托盘+气泡 / **桌面清单小组件** / 开机自启；语音速记开发中；无系统提醒事项，跨设备同步等 Phase 2 云同步 |
 | Android / iOS | 📅 计划 | Flutter 单代码库，语音与镜像走各平台系统 API |
 | HarmonyOS | 📅 计划 | 接入 [flutter-ohos](https://gitee.com/openharmony-sig/flutter_flutter) 分支 |
 
@@ -71,7 +71,7 @@ open build/macos/Build/Products/Release/flashpick.app
 1. **热键抓取**：任意应用选中文字 → `⌃⇧C`，顶部弹出「已收进闪拾」
 2. **快速捕捉窗**：`⌃⇧A`，输入文字或按住麦克风说话，回车保存
 3. **菜单栏**：点击菜单栏清单图标，勾选/查看最近待办、打开主窗口、开关桌面清单
-4. **桌面清单**：待办实时显示在桌面角落的半透明小组件上，圆圈点击即完成，双击文字打开主窗口，拖动任意摆放（位置自动记住），右键可置顶或关闭
+4. **桌面清单**：待办实时显示在桌面角落的半透明小组件上，圆圈点击即完成，双击文字打开主窗口，拖动任意摆放（位置自动记住），右键可置顶或关闭（macOS 与 Windows 均支持）
 5. **主窗口**：搜索、勾选、删除；设置页可改热键、关镜像、开自启
 
 ## 项目结构
@@ -93,7 +93,7 @@ flashpick/
 ## 路线图
 
 - [ ] **Phase 2 · 云同步**：Supabase 账号体系（auth + todos 表 + RLS + realtime），登录后多端实时同步，冲突策略 updated_at LWW；库表见 [`supabase/schema.sql`](supabase/schema.sql)
-- [x] **Windows**：C++ 原生层（RegisterHotKey / SendInput ^C / 托盘 / 气泡 HUD / 速记窗 / HKCU Run 自启），GitHub Actions 出 exe（Windows 语音速记、桌面清单为后续项）
+- [x] **Windows**：C++ 原生层（RegisterHotKey / SendInput ^C / 托盘 / 气泡 HUD / 速记窗 / 桌面清单小组件 / HKCU Run 自启），GitHub Actions 出 exe（Windows 语音速记为后续项）
 - [ ] **iOS / Android**：移动端语音（speech_to_text）、桌面镜像对应（Google Tasks / 系统日历）
 - [ ] **HarmonyOS**：接入 flutter-ohos，DevEco 出 hap
 - [ ] 应用图标与启动渲染资源
