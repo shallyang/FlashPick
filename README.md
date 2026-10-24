@@ -42,7 +42,7 @@ Windows 实现说明：热键走 `RegisterHotKey`，抓取走 `SendInput ^C` + �
 ## 从源码构建（macOS）
 
 ```bash
-git clone <本仓库>
+git clone https://github.com/shallyang/FlashPick.git
 cd flashpick
 
 # 国内网络建议先配置镜像（已配置可跳过）
